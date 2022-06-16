@@ -20,7 +20,7 @@ class Exp(MyExp):
         self.depth = 1.0
         self.width = 1.0
         self.warmup_epochs = 1
-        self.max_epoch=3
+        self.max_epoch=40
         self.input_size=[1280,1280]
         self.test_size=[1280,1280]
         self.eval_interval=1

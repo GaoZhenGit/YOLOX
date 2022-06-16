@@ -13,7 +13,7 @@ import torch
 import os,sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from yolox.data.data_augment import ValTransform
-from yolox.data.datasets import COCO_CLASSES
+from yolox.data.datasets import VOC_CLASSES
 from yolox.exp import get_exp
 from yolox.utils import fuse_model, get_model_info, postprocess, vis
 
@@ -31,7 +31,7 @@ def make_parser():
     parser.add_argument(
         "--path", default="./assets/dog.jpg", help="path to images or video"
     )
-    parser.add_argument("--camid", type=int, default=0, help="webcam demo camera id")
+    parser.add_argument("--camid", type=str, default=0, help="webcam demo camera id")
     parser.add_argument(
         "--save_result",
         action="store_true",
@@ -84,6 +84,12 @@ def make_parser():
         action="store_true",
         help="Using TensorRT model for testing.",
     )
+    parser.add_argument(
+        "--push",
+        dest="push",
+        default='rtmp://localhost/live/livestream',
+        help="push to rtmp server.",
+    )
     return parser
 
 
@@ -103,7 +109,7 @@ class Predictor(object):
         self,
         model,
         exp,
-        cls_names=COCO_CLASSES,
+        cls_names=VOC_CLASSES,
         trt_file=None,
         decoder=None,
         device="cpu",
@@ -212,6 +218,12 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)  # float
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
     fps = cap.get(cv2.CAP_PROP_FPS)
+    from stream.RtmpPush import RtmpPush
+    print('result will push to:' + args.push)
+    rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
+    from stream.OpencvRingBuffer import OpencvRingBuffer
+    bcap = OpencvRingBuffer(cap=cap)
+    bcap.startcap()
     if args.save_result:
         save_folder = os.path.join(
             vis_folder, time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
@@ -225,21 +237,41 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
         vid_writer = cv2.VideoWriter(
             save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (int(width), int(height))
         )
-    while True:
-        ret_val, frame = cap.read()
-        if ret_val:
-            outputs, img_info = predictor.inference(frame)
-            result_frame = predictor.visual(outputs[0], img_info, predictor.confthre)
-            if args.save_result:
-                vid_writer.write(result_frame)
+    try:
+        real_fps = 0
+        while True:
+            ret_val, frame = bcap.getnew()
+            t1 = time.time()
+            if ret_val:
+                outputs, img_info = predictor.inference(frame)
+                result_frame = predictor.visual(outputs[0], img_info, predictor.confthre)
+                if args.save_result:
+                    vid_writer.write(result_frame)
+                else:
+                    cv2.putText(result_frame, 
+                        'fps:%.1f' % real_fps, 
+                        (15,30), fontFace=cv2.FONT_HERSHEY_COMPLEX, color=(0,0,255), fontScale=1, thickness=2)
+                    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                    cv2.putText(result_frame, 
+                        date, 
+                        (15,60), fontFace=cv2.FONT_HERSHEY_COMPLEX, color=(0,0,255), fontScale=1, thickness=2)
+                    cv2.namedWindow("yolox", cv2.WINDOW_NORMAL)
+                    cv2.imshow("yolox", result_frame)
+                    rtmp.push(result_frame)
+                    real_fps = 1.0/(time.time() - t1)
+                ch = cv2.waitKey(1)
+                if ch == 27 or ch == ord("q") or ch == ord("Q"):
+                    break
             else:
-                cv2.namedWindow("yolox", cv2.WINDOW_NORMAL)
-                cv2.imshow("yolox", result_frame)
-            ch = cv2.waitKey(1)
-            if ch == 27 or ch == ord("q") or ch == ord("Q"):
-                break
-        else:
-            break
+                print('rebooting webcam...')
+                bcap.stopcap()
+                cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)
+                bcap = OpencvRingBuffer(cap=cap)
+                bcap.startcap()
+    except Exception as e:
+        print(e)
+    bcap.stopcap()
+    rtmp.release()
 
 
 def main(exp, args):
@@ -304,7 +336,7 @@ def main(exp, args):
         decoder = None
 
     predictor = Predictor(
-        model, exp, COCO_CLASSES, trt_file, decoder,
+        model, exp, VOC_CLASSES, trt_file, decoder,
         args.device, args.fp16, args.legacy,
     )
     current_time = time.localtime()

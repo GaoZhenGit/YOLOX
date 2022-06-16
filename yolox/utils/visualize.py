@@ -27,7 +27,7 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
         font = cv2.FONT_HERSHEY_SIMPLEX
 
         txt_size = cv2.getTextSize(text, font, 0.4, 1)[0]
-        cv2.rectangle(img, (x0, y0), (x1, y1), color, 2)
+        cv2.rectangle(img, (x0, y0), (x1, y1), color, 1)
 
         txt_bk_color = (_COLORS[cls_id] * 255 * 0.7).astype(np.uint8).tolist()
         cv2.rectangle(
@@ -44,6 +44,9 @@ def vis(img, boxes, scores, cls_ids, conf=0.5, class_names=None):
 
 _COLORS = np.array(
     [
+        0.000, 1.000, 0.000,
+        0.000, 0.000, 1.000,
+        0.000, 1.000, 1.000,
         0.000, 0.447, 0.741,
         0.850, 0.325, 0.098,
         0.929, 0.694, 0.125,
