@@ -1,0 +1,14 @@
+Test a video:
+	python tools/demo.py video -f exps/example/yolox_voc/yolox_voc_s.py -c best_ckpt.pth --path test.mp4 --conf 0.25 --nms 0.45 --tsize 1280 --save_result --device gpu
+
+Read from rtmp server and push to rtmp server:
+    python tools/demo.py webcam -f exps/example/yolox_voc/yolox_voc_s.py -c best_ckpt.pth --camid rtmp://18.166.154.193/live/abc --push rtmp://18.166.154.193/live/livestream  --conf 0.25 --nms 0.45 --tsize 1280 --device gpu
+
+Train a network:
+	python tools/train.py -f exps/example/yolox_voc/yolox_voc_s.py -d 0 -b 2 --fp16  -c yolox_l.pth
+
+Resume a training:
+	python tools/train.py -f exps/example/yolox_voc/yolox_voc_s.py -d 0 -b 2 --fp16  -c YOLOX_outputs\yolox_voc_s\latest_ckpt.pth --resume
+
+Change Settings:
+	yolox_voc_s.py

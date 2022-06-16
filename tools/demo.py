@@ -218,12 +218,13 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)  # float
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
     fps = cap.get(cv2.CAP_PROP_FPS)
-    from stream.RtmpPush import RtmpPush
-    print('result will push to:' + args.push + ' w:'+str(width) + 'h:'+str(height) + 'fps:'+str(fps))
-    rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
-    from stream.OpencvRingBuffer import OpencvRingBuffer
-    bcap = OpencvRingBuffer(cap=cap)
-    bcap.startcap()
+    if args.demo != "video":
+        from stream.RtmpPush import RtmpPush
+        print('result will push to:' + args.push + ' w:'+str(width) + 'h:'+str(height) + 'fps:'+str(fps))
+        rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
+        from stream.OpencvRingBuffer import OpencvRingBuffer
+        bcap = OpencvRingBuffer(cap=cap)
+        bcap.startcap()
     if args.save_result:
         save_folder = os.path.join(
             vis_folder, time.strftime("%Y_%m_%d_%H_%M_%S", current_time)
@@ -240,7 +241,10 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     try:
         real_fps = 0
         while True:
-            ret_val, frame = bcap.getnew()
+            if args.demo != "video":
+                ret_val, frame = bcap.getnew()
+            else:
+                ret_val, frame = cap.read()
             t1 = time.time()
             if ret_val:
                 outputs, img_info = predictor.inference(frame)
@@ -262,7 +266,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                 ch = cv2.waitKey(1)
                 if ch == 27 or ch == ord("q") or ch == ord("Q"):
                     break
-            else:
+            elif args.demo != "video":
                 print('rebooting webcam...')
                 bcap.stopcap()
                 rtmp.release()
@@ -270,10 +274,15 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                 bcap = OpencvRingBuffer(cap=cap)
                 bcap.startcap()
                 rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
+            else:
+                break
     except Exception as e:
         print(e)
-    bcap.stopcap()
-    rtmp.release()
+    if args.demo != "video":
+        bcap.stopcap()
+        rtmp.release()
+    if args.save_result:
+        vid_writer.release()
 
 
 def main(exp, args):
