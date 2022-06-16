@@ -219,7 +219,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
     fps = cap.get(cv2.CAP_PROP_FPS)
     from stream.RtmpPush import RtmpPush
-    print('result will push to:' + args.push)
+    print('result will push to:' + args.push + ' w:'+str(width) + 'h:'+str(height) + 'fps:'+str(fps))
     rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
     from stream.OpencvRingBuffer import OpencvRingBuffer
     bcap = OpencvRingBuffer(cap=cap)
@@ -265,9 +265,11 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
             else:
                 print('rebooting webcam...')
                 bcap.stopcap()
+                rtmp.release()
                 cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)
                 bcap = OpencvRingBuffer(cap=cap)
                 bcap.startcap()
+                rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
     except Exception as e:
         print(e)
     bcap.stopcap()
