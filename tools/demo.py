@@ -10,7 +10,8 @@ from loguru import logger
 import cv2
 
 import torch
-
+import os,sys
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from yolox.data.data_augment import ValTransform
 from yolox.data.datasets import COCO_CLASSES
 from yolox.exp import get_exp

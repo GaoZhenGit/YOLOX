@@ -7,20 +7,29 @@ import torch.distributed as dist
 from yolox.data import get_yolox_datadir
 from yolox.exp import Exp as MyExp
 
+dataset_path = 'F:\\dataset\\drones_aug'
+image_dir_name = 'images'
+label_dir_name = 'Annotations'
+train_ids_file_name = 'trainval.txt'
+val_ids_file_name = 'test.txt'
 
 class Exp(MyExp):
     def __init__(self):
         super(Exp, self).__init__()
-        self.num_classes = 20
-        self.depth = 0.33
-        self.width = 0.50
+        self.num_classes = 3
+        self.depth = 1.0
+        self.width = 1.0
         self.warmup_epochs = 1
+        self.max_epoch=3
+        self.input_size=[1280,1280]
+        self.test_size=[1280,1280]
+        self.eval_interval=1
 
         # ---------- transform config ------------ #
-        self.mosaic_prob = 1.0
-        self.mixup_prob = 1.0
-        self.hsv_prob = 1.0
-        self.flip_prob = 0.5
+        self.mosaic_prob = 0
+        self.mixup_prob = 0
+        self.hsv_prob = 0
+        self.flip_prob = 0
 
         self.exp_name = os.path.split(os.path.realpath(__file__))[1].split(".")[0]
 
@@ -42,8 +51,10 @@ class Exp(MyExp):
 
         with wait_for_the_master(local_rank):
             dataset = VOCDetection(
-                data_dir=os.path.join(get_yolox_datadir(), "VOCdevkit"),
-                image_sets=[('2007', 'trainval'), ('2012', 'trainval')],
+                data_dir=dataset_path,
+                image_dir_name=image_dir_name,
+                label_dir_name=label_dir_name,
+                ids_file_name=train_ids_file_name,
                 img_size=self.input_size,
                 preproc=TrainTransform(
                     max_labels=50,
@@ -100,8 +111,10 @@ class Exp(MyExp):
         from yolox.data import VOCDetection, ValTransform
 
         valdataset = VOCDetection(
-            data_dir=os.path.join(get_yolox_datadir(), "VOCdevkit"),
-            image_sets=[('2007', 'test')],
+            data_dir=dataset_path,
+            image_dir_name=image_dir_name,
+            label_dir_name=label_dir_name,
+            ids_file_name=val_ids_file_name,
             img_size=self.test_size,
             preproc=ValTransform(legacy=legacy),
         )

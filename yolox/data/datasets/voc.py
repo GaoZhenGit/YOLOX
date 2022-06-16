@@ -102,6 +102,9 @@ class VOCDetection(Dataset):
     def __init__(
         self,
         data_dir,
+        image_dir_name,
+        label_dir_name,
+        ids_file_name,
         image_sets=[("2007", "trainval"), ("2012", "trainval")],
         img_size=(416, 416),
         preproc=None,
@@ -116,18 +119,13 @@ class VOCDetection(Dataset):
         self.preproc = preproc
         self.target_transform = target_transform
         self.name = dataset_name
-        self._annopath = os.path.join("%s", "Annotations", "%s.xml")
-        self._imgpath = os.path.join("%s", "JPEGImages", "%s.jpg")
+        self._annopath = os.path.join("%s", label_dir_name, "%s.xml")
+        self._imgpath = os.path.join("%s", image_dir_name, "%s.png")
         self._classes = VOC_CLASSES
         self.ids = list()
-        for (year, name) in image_sets:
-            self._year = year
-            rootpath = os.path.join(self.root, "VOC" + year)
-            for line in open(
-                os.path.join(rootpath, "ImageSets", "Main", name + ".txt")
-            ):
-                self.ids.append((rootpath, line.strip()))
-
+        self.ids_file_path = os.path.join(data_dir, ids_file_name)
+        for line in open(self.ids_file_path):
+            self.ids.append((data_dir, line.strip()))
         self.annotations = self._load_coco_annotations()
         self.imgs = None
         if cache:
@@ -279,7 +277,7 @@ class VOCDetection(Dataset):
 
     def _get_voc_results_file_template(self):
         filename = "comp4_det_test" + "_{:s}.txt"
-        filedir = os.path.join(self.root, "results", "VOC" + self._year, "Main")
+        filedir = os.path.join(self.root, "results", "Main")
         if not os.path.exists(filedir):
             os.makedirs(filedir)
         path = os.path.join(filedir, filename)
@@ -311,18 +309,17 @@ class VOCDetection(Dataset):
                         )
 
     def _do_python_eval(self, output_dir="output", iou=0.5):
-        rootpath = os.path.join(self.root, "VOC" + self._year)
         name = self.image_set[0][1]
-        annopath = os.path.join(rootpath, "Annotations", "{:s}.xml")
-        imagesetfile = os.path.join(rootpath, "ImageSets", "Main", name + ".txt")
+        annopath = self._annopath % (self.root, "{:s}")
+        imagesetfile = self.ids_file_path
         cachedir = os.path.join(
-            self.root, "annotations_cache", "VOC" + self._year, name
+            self.root, "annotations_cache"
         )
         if not os.path.exists(cachedir):
             os.makedirs(cachedir)
         aps = []
         # The PASCAL VOC metric changed in 2010
-        use_07_metric = True if int(self._year) < 2010 else False
+        use_07_metric = False
         print("Eval IoU : {:.2f}".format(iou))
         if output_dir is not None and not os.path.isdir(output_dir):
             os.mkdir(output_dir)
