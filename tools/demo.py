@@ -90,6 +90,13 @@ def make_parser():
         default='rtmp://localhost/live/livestream',
         help="push to rtmp server.",
     )
+    parser.add_argument(
+        "--ofps",
+        dest="ofps",
+        default=14,
+        type=int,
+        help="approximate push fps",
+    )
     return parser
 
 
@@ -218,12 +225,13 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)  # float
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
     fps = cap.get(cv2.CAP_PROP_FPS)
+    output_fps = args.ofps
     if args.demo != "video":
         from stream.RtmpPush import RtmpPush
-        print('result will push to:' + args.push + ' w:'+str(width) + 'h:'+str(height) + 'fps:'+str(fps))
-        rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
+        print('result will push to:' + args.push + ' w:'+str(width) + ' h:'+str(height) + ' fps:'+str(fps) + ' ofps:'+str(output_fps))
+        rtmp = RtmpPush(rtmp_url=args.push, fps=output_fps, width=width, height=height)
         from stream.OpencvRingBuffer import OpencvRingBuffer
-        bcap = OpencvRingBuffer(cap=cap)
+        bcap = OpencvRingBuffer(cap=cap,proximate_output_fps=output_fps)
         bcap.startcap()
     if args.save_result:
         save_folder = os.path.join(
@@ -236,7 +244,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
             save_path = os.path.join(save_folder, "camera.mp4")
         logger.info(f"video save_path is {save_path}")
         vid_writer = cv2.VideoWriter(
-            save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (int(width), int(height))
+            save_path, cv2.VideoWriter_fourcc(*"mp4v"), output_fps, (int(width), int(height))
         )
     try:
         real_fps = 0
@@ -249,20 +257,17 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
             if ret_val:
                 outputs, img_info = predictor.inference(frame)
                 result_frame = predictor.visual(outputs[0], img_info, predictor.confthre)
+                cv2.putText(result_frame, 'fps:%.1f' % real_fps, 
+                    (15,30), fontFace=cv2.FONT_HERSHEY_COMPLEX, color=(0,0,255), fontScale=1, thickness=2)
+                date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                cv2.putText(result_frame, date, 
+                    (15,60), fontFace=cv2.FONT_HERSHEY_COMPLEX, color=(0,0,255), fontScale=1, thickness=2)
                 if args.save_result:
                     vid_writer.write(result_frame)
-                else:
-                    cv2.putText(result_frame, 
-                        'fps:%.1f' % real_fps, 
-                        (15,30), fontFace=cv2.FONT_HERSHEY_COMPLEX, color=(0,0,255), fontScale=1, thickness=2)
-                    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-                    cv2.putText(result_frame, 
-                        date, 
-                        (15,60), fontFace=cv2.FONT_HERSHEY_COMPLEX, color=(0,0,255), fontScale=1, thickness=2)
-                    cv2.namedWindow("yolox", cv2.WINDOW_NORMAL)
-                    cv2.imshow("yolox", result_frame)
-                    rtmp.push(result_frame)
-                    real_fps = 1.0/(time.time() - t1)
+                cv2.namedWindow("yolox", cv2.WINDOW_NORMAL)
+                cv2.imshow("yolox", result_frame)
+                if args.demo != "video": rtmp.push(result_frame)
+                real_fps = 1.0/(time.time() - t1)
                 ch = cv2.waitKey(1)
                 if ch == 27 or ch == ord("q") or ch == ord("Q"):
                     break
@@ -271,7 +276,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                 bcap.stopcap()
                 rtmp.release()
                 cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)
-                bcap = OpencvRingBuffer(cap=cap)
+                bcap = OpencvRingBuffer(cap=cap,proximate_output_fps=output_fps)
                 bcap.startcap()
                 rtmp = RtmpPush(rtmp_url=args.push, fps=10, width=width, height=height)
             else:

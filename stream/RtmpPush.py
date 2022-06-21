@@ -8,7 +8,6 @@ class RtmpPush:
         width = int(width)
         height = int(height)
         sizeStr = str(width) + 'x' + str(height)
-        fps = 10
         hz = int(1000.0 / fps)
         print ('------------------size:'+ sizeStr + ' fps:' + str(fps) + ' hz:' + str(hz) + '------------------')
         command = ['ffmpeg',

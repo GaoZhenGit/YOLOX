@@ -4,13 +4,15 @@ from queue import Queue
 import numpy as np
 
 class OpencvRingBuffer:
-    def __init__(self,cap,ring_size=50,keep_percentage=45):
+    def __init__(self,cap,proximate_output_fps=14,ring_size=50,keep_percentage=75,auto_keep_rate=True):
         self.items = [0 for i in range(ring_size)]
         self.queue = Queue(maxsize=ring_size)
         self.ring_size = ring_size #环形缓冲大小
         self.cap=cap    #cv2.VideoCapture(0)对象
         self.thread=threading.Thread(target=self.run)   #控制线程
         self.stopflag=0 #安全停止线程
+        self.auto_keep_rate = auto_keep_rate
+        self.proximate_output_fps = proximate_output_fps
         self.keep_percentage = int(keep_percentage) #为了匹配帧率，跳过帧数的比率
         self.event = threading.Event()
         self.frame_count = 0
@@ -30,6 +32,7 @@ class OpencvRingBuffer:
         self.stopflag=1
     def run(self): #线程
         self.event.set()
+        start_time = time.time()
         while(self.stopflag==0):
             self.cap.grab()
             ret,img=self.cap.retrieve()
@@ -40,11 +43,20 @@ class OpencvRingBuffer:
                 else:
                     self.skip_frame_count = self.skip_frame_count+1
                 if self.frame_count % 250 == 0:
+                    cost = time.time() - start_time
+                    rec_fps = 250 / cost
+                    start_time = time.time()
                     print(
                         '--------------skip frame:',  self.skip_frame_count,
-                        'total:', self.frame_count,
-                        'skip rate:', (self.skip_frame_count/self.frame_count), 
+                        'total:'+str(self.frame_count),
+                        'skip-rate:'+str(self.skip_frame_count/self.frame_count), 
+                        'rec-fps:%.2f' % rec_fps,
                         '--------------')
+                    if self.auto_keep_rate:
+                        self.keep_percentage = int(self.proximate_output_fps / rec_fps * 100)
+                        print('--------------auto keep rate:'+str(self.keep_percentage)+'%--------------')
+                        self.__set_skip()
+                        pass
             else:
                 print("Plz check camera\n")
                 time.sleep(0.5)
