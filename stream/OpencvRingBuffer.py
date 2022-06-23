@@ -2,6 +2,7 @@ import threading
 import time
 from queue import Queue
 import numpy as np
+from loguru import logger as LOGGER
 
 class OpencvRingBuffer:
     def __init__(self,cap,proximate_output_fps=14,ring_size=50,keep_percentage=75,auto_keep_rate=True):
@@ -27,7 +28,7 @@ class OpencvRingBuffer:
         self.stopflag=0
         self.thread.start()
         self.event.wait()
-        print('--------------buffer thread start--------------')
+        LOGGER.info('--------------buffer thread start--------------')
     def stopcap(self): #停止捕捉
         self.stopflag=1
     def run(self): #线程
@@ -46,23 +47,23 @@ class OpencvRingBuffer:
                     cost = time.time() - start_time
                     rec_fps = 250 / cost
                     start_time = time.time()
-                    print(
-                        '--------------skip frame:',  self.skip_frame_count,
-                        'total:'+str(self.frame_count),
-                        'skip-rate:'+str(self.skip_frame_count/self.frame_count), 
-                        'rec-fps:%.2f' % rec_fps,
+                    LOGGER.info(
+                        '--------------skip frame:'+str(self.skip_frame_count)+' '+
+                        'total:'+str(self.frame_count)+' '+
+                        'skip-rate:'+str(self.skip_frame_count/self.frame_count)+' '+
+                        ('rec-fps:%.2f' % rec_fps+' ')+
                         '--------------')
                     if self.auto_keep_rate:
                         self.keep_percentage = int(self.proximate_output_fps / rec_fps * 100)
-                        print('--------------auto keep rate:'+str(self.keep_percentage)+'%--------------')
+                        LOGGER.info('--------------auto keep rate:'+str(self.keep_percentage)+'%--------------')
                         self.__set_skip()
                         pass
             else:
-                print("Plz check camera\n")
+                LOGGER.info("Plz check camera\n")
                 time.sleep(0.5)
     def push(self,img):
         if self.queue.full():
-            print('--------------cv buffer full--------------')
+            LOGGER.info('--------------cv buffer full--------------')
             for i in range(int(self.ring_size*0.3)): self.queue.get_nowait()
         self.queue.put_nowait(img)
     def __try_get_frame(self,timeout):
@@ -75,13 +76,13 @@ class OpencvRingBuffer:
         ret, img = self.__try_get_frame(0.5)
         if ret:
             return ret, img
-        print('--------------cv buffer empty--------------')
+        LOGGER.info('--------------cv buffer empty--------------')
         ret, img = self.__try_get_frame(2)
         if ret:
             return ret, img
-        print('--------------cv buffer empty 2 second--------------')
+        LOGGER.info('--------------cv buffer empty 2 second--------------')
         ret, img = self.__try_get_frame(2)
         if ret:
             return ret, img
-        print('--------------cv buffer empty return null--------------')
+        LOGGER.info('--------------cv buffer empty return null--------------')
         return False, None

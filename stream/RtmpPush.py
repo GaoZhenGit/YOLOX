@@ -1,6 +1,7 @@
 import time
 import subprocess as sp
 from threading import Thread
+from loguru import logger as LOGGER
 
 
 class RtmpPush:
@@ -9,7 +10,7 @@ class RtmpPush:
         height = int(height)
         sizeStr = str(width) + 'x' + str(height)
         hz = int(1000.0 / fps)
-        print ('------------------size:'+ sizeStr + ' fps:' + str(fps) + ' hz:' + str(hz) + '------------------')
+        LOGGER.info('------------------size:'+ sizeStr + ' fps:' + str(fps) + ' hz:' + str(hz) + '------------------')
         command = ['ffmpeg',
                 '-hwaccel','cuvid',
                 '-y',
