@@ -19,6 +19,7 @@ from yolox.utils import fuse_model, get_model_info, postprocess, vis
 
 IMAGE_EXT = [".jpg", ".jpeg", ".webp", ".bmp", ".png"]
 
+from stream import driver
 
 def make_parser():
     parser = argparse.ArgumentParser("YOLOX Demo!")
@@ -269,7 +270,8 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                 if args.demo != "video": rtmp.push(result_frame)
                 real_fps = 1.0/(time.time() - t1)
                 ch = cv2.waitKey(1)
-                if ch == 27 or ch == ord("q") or ch == ord("Q"):
+                signal_get = driver.needSubProcessStop()
+                if ch == 27 or ch == ord("q") or ch == ord("Q") or signal_get:
                     break
             elif args.demo != "video":
                 print('rebooting webcam...')
@@ -286,6 +288,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     if args.demo != "video":
         bcap.stopcap()
         rtmp.release()
+        driver.setSavePath(save_path)
     if args.save_result:
         vid_writer.release()
 
@@ -361,6 +364,12 @@ def main(exp, args):
     elif args.demo == "video" or args.demo == "webcam":
         imageflow_demo(predictor, vis_folder, current_time, args)
 
+def run_from_other_process(*args):
+    driver.multiprocess_queue = args[-1]
+    args = args[:-1]
+    args = make_parser().parse_args(args)
+    exp = get_exp(args.exp_file, args.name)
+    main(exp, args)
 
 if __name__ == "__main__":
     args = make_parser().parse_args()

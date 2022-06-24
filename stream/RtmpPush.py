@@ -37,6 +37,7 @@ class RtmpPush:
 
     def push(self, frame):
         self.pipe.stdin.write(frame.tostring())
+        self.pipe.stdin.flush()
     
     def release(self):
         self.pipe.terminate()
