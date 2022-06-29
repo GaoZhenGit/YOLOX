@@ -1,11 +1,12 @@
-from time import sleep
+from time import sleep, time
 import requests
 from multiprocessing import Process
 from multiprocessing import Queue
+import threading
 
 multiprocess_queue:Queue = None
 
-# should call in sub process
+# ========== should call in sub process start ========== 
 def needSubProcessStop():
     ret = multiprocess_queue is not None and not multiprocess_queue.empty()
     if ret:
@@ -17,27 +18,87 @@ def needSubProcessStop():
 def setSavePath(path):
     if multiprocess_queue is not None:
         multiprocess_queue.put(path)
-    
+
+# ========== should call in sub process end ========== 
+
+server_base_url = "http://localhost:8090/"
 
 def getRequest(url:str,param):
-    printColor('request:',url,'param:'+str(param))
+    printColor('request:'+url+',param:'+str(param))
     x = requests.post(url=url,json=param)
     code = x.status_code
-    printColor('code:',code)
+    printColor('request:'+url+'code:'+str(code))
     if code == 200:
         return x.json()
     else:
         return None
 
-def isLiveStart():
-    ret = getRequest('http://3.88.236.75:8080/login', {'user':{'email':'gaozhen@connect.hku.hk','password':'123'}})
-    printColor(ret['result'])
+def uploadDetectionResult():
+    printColor('uploadDetectionResult')
+    pass
 
+
+class NetworkFlow:
+    def __init__(self) -> None:
+        self.streamUrl = ''
+        self.resultUrl = ''
+        pass
+
+    def isLiveStart(self):
+        ret = getRequest(server_base_url+'isLiveStart', {})
+        printColor(str(ret))
+        success = ret['result'].lower() == 'success'
+        if success:
+            self.streamUrl = ret['streamUrl']
+            self.resultUrl = ret['resultUrl']
+            return True
+        else:
+            return False
+
+    def isLiveStop(self):
+        ret = getRequest(server_base_url+'isLiveStop', {"streamUrl":self.streamUrl})
+        printColor(str(ret))
+        return ret['result'].lower() == 'success'
+
+    def uploadVideo(self,path):
+        printColor('uploadVideo to:' + path)
+        file_name = str(int(time())) + '.mp4'
+        url=server_base_url+'videoUpload'
+        files = {'fileName': (file_name,open(path, 'rb'),'multipart/form-data')}
+        p = {'streamUrl':self.streamUrl}
+        x = requests.post(url=url,files=files,params=p)
+        printColor(str(x.json()))
+        self.uploadVideoName = file_name
+
+    def start(self):
+        while True:
+            if not self.isLiveStart():
+                sleep(1)
+                printColor('no live start')
+                continue
+            printColor('receive start message')
+            driver = Driver()
+            driver.execYolo(src=self.streamUrl, des=self.resultUrl)
+            sleep(20) # give some free time until yolo really start
+            while True:
+                if not self.isLiveStop() and driver.processAlive:
+                    sleep(3)
+                    printColor('receive continue message')
+                    continue
+                else:
+                    printColor('receive end message')
+                    driver.stopYolo()
+                    break
+            self.uploadVideo(path=driver.getSavePath())
+            uploadDetectionResult()
+            printColor('one live end')
+            sleep(5) # give some free time before next detection
+            
 class Driver:
     def __init__(self) -> None:
         pass
     
-    def execYolo(self):
+    def execYolo(self, src, des):
         self.q = Queue()
         args = (
             "webcam",
@@ -45,10 +106,8 @@ class Driver:
             "exps/example/yolox_voc/yolox_voc_s.py",
             "-c",
             "best_ckpt.pth",
-            "--camid",
-            "rtmp://18.166.154.193/live/abc",
-            "--push",
-            "rtmp://18.166.154.193/live/livestream",
+            "--camid", src,
+            "--push", des,
             "--ofps",
             "14",
             "--conf",
@@ -69,6 +128,18 @@ class Driver:
         self.process = Process(target=demo.run_from_other_process, args=args, name='YoloProcess')
         self.process.start()
         printColor('yolo process start!')
+        self.checkThread = threading.Thread(target=self.__checkProcessStatus)
+        self.processAlive = self.process.is_alive()
+        self.checkThread.start()
+
+    def __checkProcessStatus(self):
+        while True:
+            sleep(1)
+            self.processAlive = self.process.is_alive()
+            if not self.processAlive:
+                printColor('yolo process end detect')
+                break;
+        pass
 
     def stopYolo(self):
         self.q.put('stop')
@@ -82,11 +153,9 @@ class Driver:
         return path
 
 def printColor(text:str):
-    print('\033[32m' + text + '\033[0m')
+    print('\033[32m==========' + text + '==========\033[0m')
+
+
 if __name__ == '__main__':
-    driver = Driver()
-    driver.execYolo()
-    sleep(20)
-    printColor('stop process!')
-    driver.stopYolo()
-    printColor('sub save to:' + driver.getSavePath())
+    flow = NetworkFlow()
+    flow.start()
