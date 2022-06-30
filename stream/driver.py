@@ -33,10 +33,6 @@ def getRequest(url:str,param):
     else:
         return None
 
-def uploadDetectionResult():
-    printColor('uploadDetectionResult')
-    pass
-
 
 class NetworkFlow:
     def __init__(self) -> None:
@@ -61,7 +57,7 @@ class NetworkFlow:
         return ret['result'].lower() == 'success'
 
     def uploadVideo(self,path):
-        printColor('uploadVideo to:' + path)
+        printColor('uploadVideo from:' + path)
         file_name = str(int(time())) + '.mp4'
         url=server_base_url+'videoUpload'
         files = {'fileName': (file_name,open(path, 'rb'),'multipart/form-data')}
@@ -69,6 +65,17 @@ class NetworkFlow:
         x = requests.post(url=url,files=files,params=p)
         printColor(str(x.json()))
         self.uploadVideoName = file_name
+
+    def uploadResult(self, path):
+        printColor('uploadResult from:' + path)
+        file_name = self.uploadVideoName.split('.')[0]+'.txt'
+
+        url=server_base_url+'resultUpload'
+        files = {'fileName': (file_name,open(path, 'rb'),'multipart/form-data')}
+        p = {'streamUrl':self.streamUrl}
+        x = requests.post(url=url,files=files,params=p)
+        printColor(str(x.json()))
+        pass
 
     def start(self):
         while True:
@@ -89,8 +96,9 @@ class NetworkFlow:
                     printColor('receive end message')
                     driver.stopYolo()
                     break
-            self.uploadVideo(path=driver.getSavePath())
-            uploadDetectionResult()
+            video_path, ret_path = driver.getSavePath()
+            self.uploadVideo(video_path)
+            self.uploadResult(ret_path)
             printColor('one live end')
             sleep(5) # give some free time before next detection
             
@@ -147,10 +155,10 @@ class Driver:
         printColor('yolo process stop!')
 
     def getSavePath(self):
-        path = self.q.get(False)
-        if not path.endswith('.mp4'):
-            path = path + '.mp4'
-        return path
+        video_path, ret_path = self.q.get(False)
+        if not video_path.endswith('.mp4'):
+            video_path = video_path + '.mp4'
+        return video_path, ret_path
 
 def printColor(text:str):
     print('\033[32m==========' + text + '==========\033[0m')

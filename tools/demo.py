@@ -247,6 +247,8 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
         vid_writer = cv2.VideoWriter(
             save_path, cv2.VideoWriter_fourcc(*"mp4v"), output_fps, (int(width), int(height))
         )
+        from stream.ResultSaver import ResultSaver
+        ret_saver = ResultSaver()
     try:
         real_fps = 0
         while True:
@@ -268,6 +270,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                 cv2.namedWindow("yolox", cv2.WINDOW_NORMAL)
                 cv2.imshow("yolox", result_frame)
                 if args.demo != "video": rtmp.push(result_frame)
+                ret_saver.save_frame(outputs[0])
                 real_fps = 1.0/(time.time() - t1)
                 ch = cv2.waitKey(1)
                 signal_get = driver.needSubProcessStop()
@@ -288,7 +291,9 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     if args.demo != "video":
         bcap.stopcap()
         rtmp.release()
-        driver.setSavePath(save_path)
+        ret_path = os.path.join(save_folder, 'labels.txt')
+        driver.setSavePath((save_path,ret_path))
+        ret_saver.dump(ret_path)
     if args.save_result:
         vid_writer.release()
 
