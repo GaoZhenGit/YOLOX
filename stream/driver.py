@@ -3,6 +3,7 @@ import requests
 from multiprocessing import Process
 from multiprocessing import Queue
 import threading
+import uuid
 
 multiprocess_queue:Queue = None
 
@@ -21,7 +22,8 @@ def setSavePath(path):
 
 # ========== should call in sub process end ========== 
 
-server_base_url = "http://localhost:8090/"
+# server_base_url = "http://localhost:8090/"
+server_base_url = "http://36.134.145.85:8090/"
 
 def getRequest(url:str,param):
     printColor('request:'+url+',param:'+str(param))
@@ -41,7 +43,8 @@ class NetworkFlow:
         pass
 
     def isLiveStart(self):
-        ret = getRequest(server_base_url+'isLiveStart', {})
+        deviceId = uuid.getnode()
+        ret = getRequest(server_base_url+'isLiveStart', {'serverId':str(deviceId)})
         printColor(str(ret))
         success = ret['result'].lower() == 'success'
         if success:
